@@ -1,0 +1,37 @@
+---
+title: "Getting started"
+author: "Jerry Black"
+date: "January 18, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting Started
+
+#library("devtools", lib.loc="~/R/win-library/3.2")
+require(devtools)
+#install.packages('e1071')
+require(e1071)
+#install_github('Beothuk/bio.plotting')
+#install_github('Beothuk/bio.datawrangling')
+
+#install.packages('RODBC', type='source')
+
+#install.packages('rgdal')
+
+require(bio.datawrangling)
+#require(RODBC)
+require(bio.plotting)
+
+go()
+
+get_data(db="rv",usepkg='RODBC')
+
+data_filter()
+
+bucket_o_plots()
+
+get_tables(db='rv')
