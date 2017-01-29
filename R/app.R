@@ -74,8 +74,8 @@ ui <- fluidPage(
                     c('UTM Zone 20 N' = '+init=epsg:2220',
                       'Lat/Lon WGS84' = '+init=epsg:4326')),
         selectInput("colour.ramp", "Symbol Colour:",
-                    c('Black' = 'NULL',
-                      'Colours' = ' c("#edf8b1", "#7fcdbb", "#2c7fb8")')),
+                    c('Colours' = ' c("#edf8b1", "#7fcdbb", "#2c7fb8")',
+                      'Black' = 'NULL')),
         
         selectInput("bin.style", "Bin Style:",
                     c('Fixed' = 'fixed',
@@ -101,29 +101,33 @@ ui <- fluidPage(
       
       # Show a plot of the generated distribution
       mainPanel(
-         plotOutput("distPlot")
+         uiOutput("plots")
       )
    )
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-   
-  output$distPlot <- renderPlot({
-      plot.by = input$plot.by
-      if (plot.by=="<NONE>") plot.by = NULL
-      eval(parse(text = paste("colour.ramp =",input$colour.ramp))) 
-      
-      plot.value = input$plot.value
-      print(paste("input$plot.value",input$plot.value))
-      
-      chosen = cols[cols$FIELD ==plot.by,]
-      chosen.table = get(chosen[[3]])
-      entries=sort(unique(chosen.table[chosen[[1]]][,1]))
-      for (j in 1:length(entries)){
-        cat(paste0("\nWorking on ",plot.by," = '", entries[j],"'"))
+get_plot_output_list <- function(max_plots, input_n, input) {
+  # Insert plot output objects the list
+  plot.by = input$plot.by
+  if (plot.by=="<NONE>") plot.by = NULL
+  eval(parse(text = paste("colour.ramp =",input$colour.ramp))) 
+  
+  plot.value = input$plot.value
+  print(paste("input$plot.value",input$plot.value))
+  
+  chosen = cols
+  if (!is.null(plot.by)) chosen = cols[cols$FIELD == plot.by,]
+  chosen.table = get(chosen[[3]])
+  entries=sort(unique(chosen.table[chosen[[1]]][,1]))
 
-        assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[j],], envir = .GlobalEnv)
+  plot_output_list <- lapply(1:length(entries), function(i) {
+    plotname <- paste("plot", i, sep="")
+    plot_output_object <- plotOutput(plotname, height = 280, width = 250)
+    plot_output_object <- renderPlot({
+    #  for (j in 1:length(entries)){
+        cat(paste0("\nWorking on ",plot.by," = '", entries[i],"'"))
+        
+        assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[i],], envir = .GlobalEnv)
         self_filter(db)
         df.plot = summarize_catches(db=db,  lat.field = lat.field,
                                     lon.field = lon.field, quiet=TRUE)
@@ -135,17 +139,73 @@ server <- function(input, output) {
           bio.plotting::add_points(df.plot, basemap = bm,
                                    bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
                                    trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
-                                   lon.field = lon.field,colour.ramp = colour.ramp,
-                                   plot.field.pretty = entries[j])
+                                   lon.field = lon.field,colour.ramp = colour.ramp, 
+                                   pnt.fill = 'red', 
+                                   plot.field.pretty = entries[i])
           ,silent = TRUE
         )
         
         for (m in 1:length(tab)){
           assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
         }
-      
-      }
+        
+    #  }
+    })
+    
   })
+  
+  do.call(tagList, plot_output_list) # needed to display properly.
+  
+  return(plot_output_list)
+}
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+   
+  # output$distPlot <- renderPlot({
+  #     plot.by = input$plot.by
+  #     if (plot.by=="<NONE>") plot.by = NULL
+  #     eval(parse(text = paste("colour.ramp =",input$colour.ramp))) 
+  #     
+  #     plot.value = input$plot.value
+  #     print(paste("input$plot.value",input$plot.value))
+  #     
+  #     chosen = cols[cols$FIELD ==plot.by,]
+  #     chosen.table = get(chosen[[3]])
+  #     entries=sort(unique(chosen.table[chosen[[1]]][,1]))
+  #     for (j in 1:length(entries)){
+  #       cat(paste0("\nWorking on ",plot.by," = '", entries[j],"'"))
+  # 
+  #       assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[j],], envir = .GlobalEnv)
+  #       self_filter(db)
+  #       df.plot = summarize_catches(db=db,  lat.field = lat.field,
+  #                                   lon.field = lon.field, quiet=TRUE)
+  #       #added a try block in case no data falls in the plot area
+  #       #browser()
+  #       bm=bio.plotting::make_basemap(x.limits=x.limits, y.limits=y.limits, crs.out = input$crs.out)
+  #       try(
+  #         
+  #         bio.plotting::add_points(df.plot, basemap = bm,
+  #                                  bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
+  #                                  trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
+  #                                  lon.field = lon.field,colour.ramp = colour.ramp,
+  #                                  plot.field.pretty = entries[j])
+  #         ,silent = TRUE
+  #       )
+  #       
+  #       for (m in 1:length(tab)){
+  #         assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
+  #       }
+  #     
+  #     }
+  # })
+  
+  
+   
+    observe({
+      output$plots <- renderUI({ get_plot_output_list(5, 5,input) })
+    })
+
 }
 
 # Run the application 
