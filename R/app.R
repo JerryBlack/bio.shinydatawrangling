@@ -54,67 +54,83 @@ plot.by = gsub('\\s\\([^)]*\\)', '\\1', sel.field)
 fields = cols$FIELD
 fields[length(fields)] = "NULL"
 
+print("Data initialized")
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
-   
-   # Application title
-   titlePanel("bio.shinydatawrangling"),
-
-   # Sidebar with a slider input for number of bins 
-   sidebarLayout(
-      sidebarPanel(
-        selectInput("selected.db", "Data Source:",
-                    c('Groundfish/RV/Ecosystem Surveys' = 'rv',
-                      'Industry Surveys Database' = 'isdb',
-                      'Cape Chidley Surveys' = 'chid',
-                      'Redfish Surveys' = 'redfish',
-                      'Pre-1970s Research Surveys' = 'rvp70')),
-        selectInput("crs.out", "Map Projection:",
-                    c('UTM Zone 20 N' = '+init=epsg:2220',
-                      'Lat/Lon WGS84' = '+init=epsg:4326')),
-        selectInput("colour.ramp", "Symbol Colour:",
-                    c('Colours' = ' c("#edf8b1", "#7fcdbb", "#2c7fb8")',
-                      'Black' = 'NULL')),
-        
-        selectInput("bin.style", "Bin Style:",
-                    c('Fixed' = 'fixed',
-                      'SD' = 'sd',
-                      'Equal' = 'equal',
-                      'Pretty' = 'pretty',
-                      'Quantile' = 'quantile',
-                      'K Means' = 'kmeans',
-                      'H Cluster' = 'hclust',
-                      'B Cluster' = 'bclust',
-                      'Fisher' = 'fisher',
-                      'Jenks' = 'jenks')),
-        
-         selectInput("plot.by", "Partition Variable:",
-                     fields,selected=sel.field),
-         
-         selectInput("plot.value", "Display Variable:",
-           cols[(cols$CLAS %in% c('numeric','integer','double')) & (!cols$FIELD %in% sel.field),]$FIELD,
-           selected=sel.value
-         )
-           
-      ),
-      
-      # Show a plot of the generated distribution
-      mainPanel(
-         uiOutput("plots")
-      )
-   )
+ui <- navbarPage("bio.shinydatawrangling",
+       tabPanel("Data Selection",
+                
+        # Sidebar with a slider input for number of bins 
+        sidebarLayout(
+          sidebarPanel(
+          #  conditionalPanel(
+          #    condition = "input.dataReady == true",
+              selectInput("selecteddb", "Data Source:",
+                          c('Groundfish/RV/Ecosystem Surveys' = 'rv',
+                            'Industry Surveys Database' = 'isdb',
+                            'Cape Chidley Surveys' = 'chid',
+                            'Redfish Surveys' = 'redfish',
+                            'Pre-1970s Research Surveys' = 'rvp70')
+              )
+              
+          ),
+          
+          # Show a plot of the generated distribution
+          mainPanel(
+           uiOutput("distPlots")
+          )
+       )
+       ),
+       tabPanel("Map",
+                
+          # Sidebar with a slider input for number of bins 
+          sidebarLayout(
+            sidebarPanel(
+              selectInput("crs.out", "Map Projection:",
+                          c('UTM Zone 20 N' = '+init=epsg:2220',
+                            'Lat/Lon WGS84' = '+init=epsg:4326')),
+              selectInput("colour.ramp", "Symbol Colour:",
+                          c('Colours' = ' c("#edf8b1", "#7fcdbb", "#2c7fb8")',
+                            'Black' = 'NULL')),
+              
+              selectInput("bin.style", "Bin Style:",
+                          c('Fixed' = 'fixed',
+                            'SD' = 'sd',
+                            'Equal' = 'equal',
+                            'Pretty' = 'pretty',
+                            'Quantile' = 'quantile',
+                            'K Means' = 'kmeans',
+                            'H Cluster' = 'hclust',
+                            'B Cluster' = 'bclust',
+                            'Fisher' = 'fisher',
+                            'Jenks' = 'jenks')),
+              
+              selectInput("plot.by", "Partition Variable:",
+                          fields,selected=sel.field),
+              
+              selectInput("plot.value", "Display Variable:",
+                          cols[(cols$CLAS %in% c('numeric','integer','double')) & (!cols$FIELD %in% sel.field),]$FIELD,
+                          selected=sel.value
+              )
+            ),
+          
+            # Show a plot of the generated distribution
+           mainPanel(
+              uiOutput("distPlots2")
+            )
+          )
+       )
 )
 
 get_plot_output_list <- function(max_plots, input_n, input) {
   # Insert plot output objects the list
   plot.by = input$plot.by
   if (plot.by=="<NONE>") plot.by = NULL
-  eval(parse(text = paste("colour.ramp =",input$colour.ramp))) 
-  
+  eval(parse(text = paste("colour.ramp =",input$colour.ramp)))
+
   plot.value = input$plot.value
   print(paste("input$plot.value",input$plot.value))
-  
+
   chosen = cols
   if (!is.null(plot.by)) chosen = cols[cols$FIELD == plot.by,]
   chosen.table = get(chosen[[3]])
@@ -124,88 +140,106 @@ get_plot_output_list <- function(max_plots, input_n, input) {
     plotname <- paste("plot", i, sep="")
     plot_output_object <- plotOutput(plotname, height = 280, width = 250)
     plot_output_object <- renderPlot({
-    #  for (j in 1:length(entries)){
-        cat(paste0("\nWorking on ",plot.by," = '", entries[i],"'"))
-        
-        assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[i],], envir = .GlobalEnv)
-        self_filter(db)
-        df.plot = summarize_catches(db=db,  lat.field = lat.field,
-                                    lon.field = lon.field, quiet=TRUE)
-        #added a try block in case no data falls in the plot area
-        #browser()
-        bm=bio.plotting::make_basemap(x.limits=x.limits, y.limits=y.limits, crs.out = input$crs.out)
-        try(
-          
-          bio.plotting::add_points(df.plot, basemap = bm,
-                                   bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
-                                   trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
-                                   lon.field = lon.field,colour.ramp = colour.ramp, 
-                                   pnt.fill = 'red', 
-                                   plot.field.pretty = entries[i])
-          ,silent = TRUE
-        )
-        
-        for (m in 1:length(tab)){
-          assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
-        }
-        
-    #  }
+      #  for (j in 1:length(entries)){
+      cat(paste0("\nWorking on ",plot.by," = '", entries[i],"'"))
+
+      assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[i],], envir = .GlobalEnv)
+      self_filter(db)
+      df.plot = summarize_catches(db=db,  lat.field = lat.field,
+                                  lon.field = lon.field, quiet=TRUE)
+      #added a try block in case no data falls in the plot area
+      #browser()
+      bm=bio.plotting::make_basemap(x.limits=x.limits, y.limits=y.limits, crs.out = input$crs.out)
+      try(
+
+        bio.plotting::add_points(df.plot, basemap = bm,
+                                 bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
+                                 trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
+                                 lon.field = lon.field,colour.ramp = colour.ramp,
+                                 pnt.fill = 'red',
+                                 plot.field.pretty = entries[i])
+        ,silent = TRUE
+      )
+
+      for (m in 1:length(tab)){
+        assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
+      }
+
+      #  }
     })
-    
+
   })
-  
+
   do.call(tagList, plot_output_list) # needed to display properly.
-  
+
   return(plot_output_list)
 }
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
-   
-  # output$distPlot <- renderPlot({
-  #     plot.by = input$plot.by
-  #     if (plot.by=="<NONE>") plot.by = NULL
-  #     eval(parse(text = paste("colour.ramp =",input$colour.ramp))) 
+server <- function(input, output, session) {
+  
+  # output$distPlots <- renderPlot({
+  #   plot.by = input$plot.by
+  #   if (plot.by=="<NONE>") plot.by = NULL
+  #   eval(parse(text = paste("colour.ramp =",input$colour.ramp)))
+  #   
+  #   plot.value = input$plot.value
+  #   print(paste("input$plot.value",input$plot.value))
+  #   
+  #   chosen = cols[cols$FIELD ==plot.by,]
+  #   chosen.table = get(chosen[[3]])
+  #   entries=sort(unique(chosen.table[chosen[[1]]][,1]))
+  #   for (j in 1:length(entries)){
+  #     cat(paste0("\nWorking on ",plot.by," = '", entries[j],"'"))
   #     
-  #     plot.value = input$plot.value
-  #     print(paste("input$plot.value",input$plot.value))
-  #     
-  #     chosen = cols[cols$FIELD ==plot.by,]
-  #     chosen.table = get(chosen[[3]])
-  #     entries=sort(unique(chosen.table[chosen[[1]]][,1]))
-  #     for (j in 1:length(entries)){
-  #       cat(paste0("\nWorking on ",plot.by," = '", entries[j],"'"))
-  # 
-  #       assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[j],], envir = .GlobalEnv)
-  #       self_filter(db)
-  #       df.plot = summarize_catches(db=db,  lat.field = lat.field,
-  #                                   lon.field = lon.field, quiet=TRUE)
-  #       #added a try block in case no data falls in the plot area
-  #       #browser()
-  #       bm=bio.plotting::make_basemap(x.limits=x.limits, y.limits=y.limits, crs.out = input$crs.out)
-  #       try(
-  #         
-  #         bio.plotting::add_points(df.plot, basemap = bm,
-  #                                  bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
-  #                                  trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
-  #                                  lon.field = lon.field,colour.ramp = colour.ramp,
-  #                                  plot.field.pretty = entries[j])
-  #         ,silent = TRUE
-  #       )
+  #     assign(chosen[[3]],chosen.table[chosen.table[[plot.by]]==entries[j],], envir = .GlobalEnv)
+  #     self_filter(db)
+  #     df.plot = summarize_catches(db=db,  lat.field = lat.field,
+  #                                 lon.field = lon.field, quiet=TRUE)
+  #     #added a try block in case no data falls in the plot area
+  #     #browser()
+  #     bm=bio.plotting::make_basemap(x.limits=x.limits, y.limits=y.limits, crs.out = input$crs.out)
+  #     try(
   #       
-  #       for (m in 1:length(tab)){
-  #         assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
-  #       }
+  #       bio.plotting::add_points(df.plot, basemap = bm,
+  #                                bin.style = input$bin.style, fixed.breaks.bins=fixed.breaks.bins,
+  #                                trim.fixed.breaks = trim.fixed.breaks, plot.field = input$plot.value, lat.field = lat.field,
+  #                                lon.field = lon.field,colour.ramp = colour.ramp,
+  #                                plot.field.pretty = entries[j])
+  #       ,silent = TRUE
+  #     )
   #     
+  #     for (m in 1:length(tab)){
+  #       assign(tab[m], virgin[[tab[m]]], envir = .GlobalEnv)
   #     }
+  #     
+  #   }
   # })
   
-  
-   
-    observe({
-      output$plots <- renderUI({ get_plot_output_list(5, 5,input) })
-    })
+  # 
 
+  observe({
+    # output$distPlots <- renderPrint({
+    #   chosen = cols
+    #   if (!is.null(plot.by)) chosen = cols[cols$FIELD == plot.by,]
+    #   chosen.table = get(chosen[[3]])
+    #   #summary(chosen.table)
+    #   str(chosen.table)
+    # })
+      #renderUI({ get_plot_output_list(5, 5,input) })
+    output$distPlots <-renderTable( {
+      chosen = cols
+        if (!is.null(plot.by)) chosen = cols[cols$FIELD == plot.by,]
+        chosen.table = get(chosen[[3]])
+        #summary(chosen.table)
+        #str(chosen.table)
+        return(summary(chosen.table))
+      })
+      
+    
+    output$distPlots2 <- renderUI({ get_plot_output_list(5, 5,input) })
+  })
+  
 }
 
 # Run the application 
