@@ -56,11 +56,11 @@ fields[length(fields)] = "NULL"
 
 print("Data initialized")
 
-# Define UI for application that draws a histogram
+# Define UI for application that filters and displays research data sets
 ui <- navbarPage("bio.shinydatawrangling",
        tabPanel("Data Selection",
                 
-        # Sidebar with a slider input for number of bins 
+        # Sidebar with selection for survey data source 
         sidebarLayout(
           sidebarPanel(
           #  conditionalPanel(
@@ -75,15 +75,15 @@ ui <- navbarPage("bio.shinydatawrangling",
               
           ),
           
-          # Show a plot of the generated distribution
+          # Show summary data for the selected data
           mainPanel(
-           uiOutput("distPlots")
+           uiOutput("distSummary")
           )
        )
        ),
        tabPanel("Map",
                 
-          # Sidebar with a slider input for number of bins 
+          # Sidebar with a selectors for changing the map display 
           sidebarLayout(
             sidebarPanel(
               selectInput("crs.out", "Map Projection:",
@@ -122,7 +122,7 @@ ui <- navbarPage("bio.shinydatawrangling",
        )
 )
 
-get_plot_output_list <- function(max_plots, input_n, input) {
+get_plot_output_list <- function(input) {
   # Insert plot output objects the list
   plot.by = input$plot.by
   if (plot.by=="<NONE>") plot.by = NULL
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
     #   str(chosen.table)
     # })
       #renderUI({ get_plot_output_list(5, 5,input) })
-    output$distPlots <-renderTable( {
+    output$distSummary <-renderTable( {
       chosen = cols
         if (!is.null(plot.by)) chosen = cols[cols$FIELD == plot.by,]
         chosen.table = get(chosen[[3]])
@@ -237,7 +237,7 @@ server <- function(input, output, session) {
       })
       
     
-    output$distPlots2 <- renderUI({ get_plot_output_list(5, 5,input) })
+    output$distPlots2 <- renderUI({ get_plot_output_list(input) })
   })
   
 }
